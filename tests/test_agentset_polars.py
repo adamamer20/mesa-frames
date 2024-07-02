@@ -15,7 +15,7 @@ class ExampleAgentSet(AgentSetPolars):
         self.starting_wealth = pl.Series("wealth", [1, 2, 3, 4])
 
     def add_wealth(self, amount: int) -> None:
-        self.agents += amount
+        self["wealth"] += amount
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ class Test_AgentSetPolars:
         assert agents.model == model
         assert isinstance(agents.agents, pl.DataFrame)
         assert agents.agents["unique_id"].to_list() == [0, 1, 2, 3]
-        assert isinstance(agents._mask, pl.Expr)
+        assert isinstance(agents._mask, pl.Series)
         assert isinstance(agents.random, Generator)
         assert agents.starting_wealth.to_list() == [1, 2, 3, 4]
 
@@ -118,9 +118,18 @@ class Test_AgentSetPolars:
 
     def test_do(self, fix1_AgentSetPolars: ExampleAgentSet):
         agents = fix1_AgentSetPolars
+
+        # Test with no return_results, no mask
         agents.do("add_wealth", 1)
         assert agents.agents["wealth"].to_list() == [2, 3, 4, 5]
+
+        # Test with return_results=True, no mask
         assert agents.do("add_wealth", 1, return_results=True) is None
+        assert agents.agents["wealth"].to_list() == [3, 4, 5, 6]
+
+        # Test with a mask
+        agents.do("add_wealth", 1, mask=agents["wealth"] > 3)
+        assert agents.agents["wealth"].to_list() == [3, 5, 6, 7]
 
     def test_get(self, fix1_AgentSetPolars: ExampleAgentSet):
         agents = fix1_AgentSetPolars
@@ -142,7 +151,7 @@ class Test_AgentSetPolars:
         agents = fix1_AgentSetPolars
         agents.remove([0, 1])
         assert agents.agents["unique_id"].to_list() == [2, 3]
-        with pytest.raises(KeyError) as e:
+        with pytest.raises(KeyError):
             agents.remove([1])
 
     def test_select(self, fix1_AgentSetPolars: ExampleAgentSet):
